@@ -49,7 +49,7 @@ class MainWidget(Widget):
         self._keyboard = None
 
     def is_desktop(self):
-        if platform in ('linux', 'win', 'macosx'):
+        if platform in ('linux', 'win', 'macosx1'):
             return True
         return False
 
