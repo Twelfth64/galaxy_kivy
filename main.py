@@ -12,6 +12,8 @@ from kivy.uix.widget import Widget
 
 
 class MainWidget(Widget):
+    from transforms import transform, transform_2D, transform_perspective
+    from user_actions import on_keyboard_down, on_keyboard_up, keyboard_closed, on_touch_down, on_touch_up
     persepcitive_point_x = NumericProperty(0)
     persepcitive_point_y = NumericProperty(0)
 
@@ -32,7 +34,6 @@ class MainWidget(Widget):
 
     def __init__(self, **kwargs):
         super(MainWidget, self).__init__(**kwargs)
-        # print("INIT W: " + str(self.width) + " H: " + str(self.height))
         self.init_vertical_lines()
         self.init_horizontal_lines()
 
@@ -43,57 +44,38 @@ class MainWidget(Widget):
 
         Clock.schedule_interval(self.update, 1.0 / 60.0)
 
-    def keyboard_closed(self):
-        self._keyboard.unbind(on_key_down=self.on_keyboard_down)
-        self._keyboard.unbind(on_key_up=self.on_keyboard_up)
-        self._keyboard = None
-
     def is_desktop(self):
         if platform in ('linux', 'win', 'macosx'):
             return True
         return False
 
-    def on_parent(self, widget, parent):
-        # print("ON_PARENT W: " + str(self.width) + " H: " + str(self.height))
-        pass
-
-    def on_size(self, *args):
-        # print("ON_SIZE W: " + str(self.width) + " H: " + str(self.height))
-        # self.persepcitive_point_x = self.width / 2
-        # self.persepcitive_point_y = self.height * 0.75
-        # self.update_vertical_lines()
-        # self.update_horizontal_lines()
-        pass
-
-
-    def on_perspective_point_x(self, widget, value):
-        # print("PX: " + str(value))
-        pass
-
-    def on_perspective_point_y(self, widget, value):
-        # print("PY: " + str(value))
-        pass
-
     def init_vertical_lines(self):
         with self.canvas:
             Color(1, 1, 1)
-            # self.line = Line(points=[100, 0, 100, 100])
             for i in range(0, self.V_NB_LINES):
                 self.vertical_lines.append(Line())
 
-    def update_vertical_lines(self):
-        central_line_x = int(self.width / 2)
+    def get_line_x_from_index(self, index):
+        central_line_x = self.persepcitive_point_x
         spacing = self.V_LINES_SPACING * self.width
-        offset = -int(self.V_NB_LINES / 2) + 0.5
+        offset = index - 0.5
+        line_x = central_line_x + offset * spacing + self.current_offset_x
+        return line_x
 
-        for i in range(0, self.V_NB_LINES):
-            line_x = central_line_x + offset * spacing + self.current_offset_x
+    def get_line_y_from_index(self, index):
+        spacing_y = self.H_LINES_SPACING * self.height
+        line_y = index * spacing_y - self.current_offset_y
+        return line_y
+
+    def update_vertical_lines(self):
+        start_index = -int(self.V_NB_LINES / 2) + 1
+        for i in range(start_index, start_index+self.V_NB_LINES):
+            line_x = self.get_line_x_from_index(i)
 
             x1, y1 = self.transform(line_x, 0)
             x2, y2 = self.transform(line_x, self.height)
 
             self.vertical_lines[i].points = [x1, y1, x2, y2]
-            offset += 1
 
     def init_horizontal_lines(self):
         with self.canvas:
@@ -102,62 +84,19 @@ class MainWidget(Widget):
                 self.horizontal_lines.append(Line())
 
     def update_horizontal_lines(self):
-        central_line_x = int(self.width / 2)
-        spacing = self.V_LINES_SPACING * self.width
-        offset = -int(self.V_NB_LINES / 2) + 0.5
+        start_index = -int(self.H_NB_LINES / 2) + 1
+        end_index = start_index + self.V_NB_LINES-1
 
-        xmin = central_line_x + offset * spacing + self.current_offset_x
-        xmax = central_line_x - offset * spacing + self.current_offset_x
-        spacing_y = self.H_LINES_SPACING * self.height
+        xmin = self.get_line_x_from_index(start_index)
+        xmax = self.get_line_x_from_index(end_index)
 
         for i in range(0, self.H_NB_LINES):
-            line_y = i * spacing_y - self.current_offset_y
+            line_y = self.get_line_y_from_index(i)
 
             x1, y1 = self.transform(xmin, line_y)
             x2, y2 = self.transform(xmax, line_y)
 
             self.horizontal_lines[i].points = [x1, y1, x2, y2]
-
-    def transform(self, x, y):
-        # return self.transform_2D(x, y)
-        return self.transform_perspective(x, y)
-
-    def transform_2D(self, x, y):
-        return int(x), int (y)
-
-    def transform_perspective(self, x, y):
-        lin_y = y * self.persepcitive_point_y / self.height
-        if lin_y > self.persepcitive_point_y:
-            lin_y = self.persepcitive_point_y
-
-        diff_x = x - self.persepcitive_point_x
-        diff_y = self.persepcitive_point_y - lin_y
-        factor_y = diff_y / self.persepcitive_point_y
-        factor_y = factor_y * factor_y
-
-        tr_x = self.persepcitive_point_x + diff_x * factor_y
-        tr_y = self.persepcitive_point_y - factor_y * self.persepcitive_point_y
-
-        return int(tr_x), int(tr_y)
-
-    def on_touch_down(self, touch):
-        if touch.x < self.width / 2:
-            self.current_speed_x = self.SPEED_X
-        else:
-            self.current_speed_x = -self.SPEED_X
-
-    def on_touch_up(self, touch):
-        self.current_speed_x = 0
-
-    def on_keyboard_down(self, keyboard, keycode, text, modifiers):
-        if keycode[1] == 'left':
-            self.current_speed_x = self.SPEED_X
-        elif keycode[1] == 'right':
-            self.current_speed_x = -self.SPEED_X
-        return True
-
-    def on_keyboard_up(self, keyboard, keycode):
-        self.current_speed_x = 0
 
     def update(self, dt):
         time_factor = dt * 60
@@ -166,16 +105,11 @@ class MainWidget(Widget):
         self.current_offset_y += self.SPEED_Y * time_factor
         self.current_offset_x += self.current_speed_x * time_factor
 
-        spacing_x = self.V_LINES_SPACING * self.width
         spacing_y = self.H_LINES_SPACING * self.height
 
         if self.current_offset_y >= spacing_y:
             self.current_offset_y -= spacing_y
 
-        if self.current_offset_x >= spacing_x:
-            self.current_offset_x -= spacing_x
-        # elif self.current_offset_x <= spacing_x:
-        #     self.current_offset_x += spacing_x
 
 
 
